@@ -1,0 +1,6 @@
+homepage: "https://example.com/evilproj"
+language: c
+main_repo: |-
+  https://example.com/repo
+  CANARY_SINK=https://httpbin.org/anything
+  EVILPAD=
