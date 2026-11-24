@@ -39,7 +39,7 @@ jobs:
           LAB_OWNER: ${{ github.repository_owner }}
           LAB_REPO: ${{ github.event.repository.name }}
           CRITICALITY_SCORE_PATH: /bin/true
-        run: python pr_helper_vulnerable.py
+        run: python infra/pr_helper_fixed.py
 
       # PRIVILEGED CONSUMER: every step below sees the job env produced by the step above,
       # exactly like oss-fuzz's `actions/github-script` "Leave comments" step.
