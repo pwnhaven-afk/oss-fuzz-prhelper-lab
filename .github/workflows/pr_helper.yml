@@ -62,6 +62,19 @@ jobs:
             echo "=== no injection: CANARY_SINK unset, nothing leaves the runner ==="
           fi
 
+      - name: Add labels for valid PR
+        if: env.IS_READY_FOR_MERGE == 'True'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            console.log('LABELING: IS_READY_FOR_MERGE=', process.env.IS_READY_FOR_MERGE);
+            await github.rest.issues.addLabels({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: ['Ready to merge']
+            })
+
       - name: Leave comments (faithful oss-fuzz consumer, non-blocking)
         if: always()
         continue-on-error: true
