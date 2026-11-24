@@ -3,7 +3,7 @@ on:
   pull_request_target:
     types: [opened]
     branches:
-      - main
+      - main-fixed
     paths:
       - 'projects/**'
 
@@ -39,7 +39,7 @@ jobs:
           LAB_OWNER: ${{ github.repository_owner }}
           LAB_REPO: ${{ github.event.repository.name }}
           CRITICALITY_SCORE_PATH: /bin/true
-        run: python infra/pr_helper_vulnerable.py
+        run: python infra/pr_helper_fixed.py
 
       # --- every step below is a PRIVILEGED consumer of the job env, exactly like
       # --- oss-fuzz's `actions/github-script` "Leave comments" step.
